@@ -2,7 +2,7 @@
   "name": "q-git-ai-tracker",
   "displayName": "Amazon Q → Git AI Tracker",
   "description": "Tracks Amazon Q code insertions and creates git-ai checkpoints",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "engines": {
     "vscode": "^1.90.0"
   },
