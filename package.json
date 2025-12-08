@@ -1,0 +1,54 @@
+{
+  "name": "q-git-ai-tracker",
+  "displayName": "Amazon Q → Git AI Tracker",
+  "description": "Tracks Amazon Q code insertions and creates git-ai checkpoints",
+  "version": "0.1.0",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": [
+    "onStartupFinished",
+    "onLanguage:javascript",
+    "onLanguage:typescript",
+    "onLanguage:php",
+    "onLanguage:html",
+    "onLanguage:css"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "q-git-ai.manualCheckpoint",
+        "title": "Git AI: Manual Checkpoint (Amazon Q)"
+      }
+    ],
+    "configuration": {
+      "title": "Q Git AI Tracker",
+      "properties": {
+        "q-git-ai.debounceMs": {
+          "type": "number",
+          "default": 150,
+          "minimum": 50,
+          "description": "Debounce time for text changes (ms)"
+        },
+        "q-git-ai.minChangeSize": {
+          "type": "number",
+          "default": 3,
+          "minimum": 1,
+          "description": "Minimum chars changed to consider Q insertion"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.90.0",
+    "@types/node": "18.x",
+    "typescript": "^5.4.5"
+  }
+}
