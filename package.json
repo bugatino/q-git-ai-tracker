@@ -1,8 +1,8 @@
 {
   "name": "q-git-ai-tracker",
   "displayName": "Amazon Q → Git AI Tracker",
-  "description": "Tracks Amazon Q code insertions and creates git-ai checkpoints",
-  "version": "0.1.1",
+  "description": "Tracks Amazon Q edits and creates git-ai before/after checkpoints",
+  "version": "0.2.0",
   "engines": {
     "vscode": "^1.90.0"
   },
@@ -12,20 +12,28 @@
     "onLanguage:javascript",
     "onLanguage:typescript",
     "onLanguage:php",
-    "onLanguage:html",
-    "onLanguage:css"
+    "onLanguage:python"
   ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "q-git-ai.manualCheckpoint",
-        "title": "Git AI: Manual Checkpoint (Amazon Q)"
+        "command": "q-git-ai.manualBeforeEdit",
+        "title": "Git AI: Manual Before-Edit Checkpoint (Amazon Q)"
+      },
+      {
+        "command": "q-git-ai.manualAfterEdit",
+        "title": "Git AI: Manual After-Edit Checkpoint (Amazon Q)"
       }
     ],
     "configuration": {
       "title": "Q Git AI Tracker",
       "properties": {
+        "q-git-ai.agentName": {
+          "type": "string",
+          "default": "amazon-q",
+          "description": "Agent name used for git-ai checkpoints"
+        },
         "q-git-ai.debounceMs": {
           "type": "number",
           "default": 150,
@@ -36,7 +44,7 @@
           "type": "number",
           "default": 3,
           "minimum": 1,
-          "description": "Minimum chars changed to consider Q insertion"
+          "description": "Minimum chars changed to consider AI edit"
         }
       }
     }
