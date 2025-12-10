@@ -2,11 +2,13 @@
   "name": "q-git-ai-tracker",
   "displayName": "Amazon Q → Git AI Tracker",
   "description": "Tracks Amazon Q edits and creates git-ai before/after checkpoints",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "engines": {
     "vscode": "^1.90.0"
   },
-  "categories": ["Other"],
+  "categories": [
+    "Other"
+  ],
   "activationEvents": [
     "onStartupFinished",
     "onLanguage:javascript",
@@ -45,6 +47,24 @@
           "default": 3,
           "minimum": 1,
           "description": "Minimum chars changed to consider AI edit"
+        },
+        "q-git-ai.allow_repositories": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "*"
+          ],
+          "description": "Glob patterns for repositories where git-ai is allowed"
+        },
+        "q-git-ai.exclude_repositories": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Glob patterns for repositories where git-ai is excluded"
         }
       }
     }
@@ -55,8 +75,12 @@
     "watch": "tsc -watch -p ./"
   },
   "devDependencies": {
-    "@types/vscode": "^1.90.0",
     "@types/node": "18.x",
+    "@types/vscode": "^1.90.0",
     "typescript": "^5.4.5"
+  },
+  "dependencies": {
+    "@types/minimatch": "^5.1.2",
+    "minimatch": "^5.1.6"
   }
 }

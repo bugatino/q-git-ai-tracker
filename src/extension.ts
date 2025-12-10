@@ -1,6 +1,11 @@
 import * as vscode from 'vscode';
 import { spawn } from 'child_process';
 import * as path from 'path';
+import * as fs from 'fs';
+import minimatch = require('minimatch');
+
+const GIT_AI_BIN_DIR_NAME = 'git-ai-bin'; // Kept for legacy/fallback if needed, but main logic uses ~/.git-ai
+const GIT_AI_DIR_NAME = '.git-ai';
 
 let statusBarItem: vscode.StatusBarItem;
 
@@ -22,7 +27,7 @@ interface AgentV1AiAgent {
 
 type AgentV1Input = AgentV1Human | AgentV1AiAgent;
 
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
   statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
   statusBarItem.text = '$(git-commit) AI: 0';
   statusBarItem.tooltip = 'Git AI Amazon Q tracker (agent-v1)';
@@ -44,19 +49,106 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('q-git-ai.manualAiCheckpoint', manualAiCheckpoint)
   );
 
+  // Ensure git-ai is installed and in PATH
+  await ensureGitAiSetup(context);
+
   console.log('[q-git-ai] agent-v1 integration activated');
+}
+
+async function ensureGitAiSetup(context: vscode.ExtensionContext) {
+  // 1. Check/Install git-ai
+  // Script installs to ~/.git-ai/bin
+  const homeDir = process.env.HOME || process.env.USERPROFILE || '';
+  if (!homeDir) {
+    console.error('[q-git-ai] Could not determine HOME directory.');
+    return;
+  }
+
+  const gitAiDir = path.join(homeDir, GIT_AI_DIR_NAME);
+  const binPath = path.join(gitAiDir, 'bin');
+  const executablePath = path.join(binPath, 'git-ai');
+
+  const isInstalled = fs.existsSync(executablePath);
+  
+  if (!isInstalled) {
+    vscode.window.showInformationMessage('[q-git-ai] Installing git-ai...');
+    try {
+      // Run the install script via bash
+      // curl -sSL https://raw.githubusercontent.com/acunniffe/git-ai/main/install.sh | bash
+      const installCmd = 'curl -sSL https://raw.githubusercontent.com/acunniffe/git-ai/main/install.sh | bash';
+      await runCommand(installCmd, [], homeDir); // Run in HOME
+      vscode.window.showInformationMessage('[q-git-ai] git-ai installed successfully.');
+    } catch (e) {
+      vscode.window.showErrorMessage(`[q-git-ai] Failed to install git-ai: ${e}`);
+      return;
+    }
+  }
+
+  // 2. Add to PATH
+  if (process.env.PATH && !process.env.PATH.includes(binPath)) {
+    process.env.PATH = `${binPath}${path.delimiter}${process.env.PATH}`;
+    console.log('[q-git-ai] Added git-ai to PATH:', binPath);
+  }
+  
+  // Store binPath for deactivation cleanup
+  context.workspaceState.update('git-ai-bin-path', binPath);
+}
+
+function runCommand(command: string, args: string[], cwd: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    // shell: true is important for piping
+    const proc = spawn(command, args, { cwd, shell: true });
+    
+    proc.stdout?.on('data', (d) => console.log(`[install] ${d}`));
+    proc.stderr?.on('data', (d) => console.error(`[install] ${d}`));
+
+    proc.on('close', (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`Exit code ${code}`));
+    });
+  });
+}
+
+function checkRepositoryAllowed(repoRoot: string): boolean {
+  const config = vscode.workspace.getConfiguration('q-git-ai');
+  const allowPatterns = config.get<string[]>('allow_repositories') || ['*'];
+  const excludePatterns = config.get<string[]>('exclude_repositories') || [];
+
+  // Normalize path for glob matching
+  const normalizedPath = repoRoot.replace(/\\/g, '/');
+
+  // Check exclude first
+  for (const pattern of excludePatterns) {
+    if (minimatch(normalizedPath, pattern)) {
+      console.log(`[q-git-ai] Repository excluded by pattern ${pattern}: ${repoRoot}`);
+      return false;
+    }
+  }
+
+  // Check allow
+  for (const pattern of allowPatterns) {
+    if (minimatch(normalizedPath, pattern)) {
+      return true;
+    }
+  }
+
+  console.log(`[q-git-ai] Repository not allowed: ${repoRoot}`);
+  return false;
 }
 
 async function onFileChange(uri: vscode.Uri) {
   if (!isAmazonQActive()) return;
 
-  // Nếu file đang mở, onTextChange đã handle rồi -> bỏ qua
-  const isOpen = vscode.workspace.textDocuments.some(doc => doc.uri.toString() === uri.toString());
-  if (isOpen) return;
-
   // Filter noise
   const fsPath = uri.fsPath;
   if (fsPath.includes('node_modules') || fsPath.includes('.git') || fsPath.includes(path.sep + 'out' + path.sep)) return;
+
+  const workspaceRoot = vscode.workspace.getWorkspaceFolder(uri)?.uri.fsPath;
+  if (!workspaceRoot || !checkRepositoryAllowed(workspaceRoot)) return;
+
+  // ... (rest of function)
+  const isOpen = vscode.workspace.textDocuments.some(doc => doc.uri.toString() === uri.toString());
+  if (isOpen) return;
 
   // Gửi checkpoint cho file không mở
   await sendAiCheckpoint(uri, 'amazon-q');
@@ -71,6 +163,8 @@ async function onTextChange(event: vscode.TextDocumentChangeEvent) {
   if (event.document.uri.scheme !== 'file') return;
   if (!isAmazonQActive()) return;
 
+  const workspaceRoot = vscode.workspace.getWorkspaceFolder(event.document.uri)?.uri.fsPath;
+  if (!workspaceRoot || !checkRepositoryAllowed(workspaceRoot)) return;
 
   const clipboardText = await vscode.env.clipboard.readText();
 
@@ -183,6 +277,15 @@ function isAmazonQActive(): boolean {
   return !!qExt?.isActive;
 }
 
-export function deactivate() {
+export function deactivate(context: vscode.ExtensionContext) {
   statusBarItem.dispose();
+  
+  // Remove git-ai from PATH
+  const binPath = context.workspaceState.get<string>('git-ai-bin-path');
+  if (binPath && process.env.PATH) {
+    const pathDirs = process.env.PATH.split(path.delimiter);
+    const newPath = pathDirs.filter(p => p !== binPath).join(path.delimiter);
+    process.env.PATH = newPath;
+    console.log('[q-git-ai] Removed git-ai from PATH');
+  }
 }
