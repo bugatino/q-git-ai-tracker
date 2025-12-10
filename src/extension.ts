@@ -71,8 +71,17 @@ async function onTextChange(event: vscode.TextDocumentChangeEvent) {
   if (event.document.uri.scheme !== 'file') return;
   if (!isAmazonQActive()) return;
 
+
+  const clipboardText = await vscode.env.clipboard.readText();
+
   const hasLargeChange = event.contentChanges.some((c) => {
     const text = c.text;
+
+    // Detected paste from clipboard -> ignore
+    if (text === clipboardText) {
+      return false;
+    }
+
     const isMultiLine = text.includes('\n');
     const isFastInsert = c.rangeLength === 0;
     const isLargeEnough = text.length >= 3;
