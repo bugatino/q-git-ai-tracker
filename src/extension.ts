@@ -32,6 +32,12 @@ export function activate(context: vscode.ExtensionContext) {
   const disposableTextChange = vscode.workspace.onDidChangeTextDocument(onTextChange);
   context.subscriptions.push(disposableTextChange);
 
+  // Lắng file system change để detect AI edit trên file không mở
+  const watcher = vscode.workspace.createFileSystemWatcher('**/*');
+  context.subscriptions.push(watcher);
+  watcher.onDidChange(onFileChange);
+  watcher.onDidCreate(onFileChange);
+
   // Manual commands để test
   context.subscriptions.push(
     vscode.commands.registerCommand('q-git-ai.manualHumanCheckpoint', manualHumanCheckpoint),
@@ -41,9 +47,28 @@ export function activate(context: vscode.ExtensionContext) {
   console.log('[q-git-ai] agent-v1 integration activated');
 }
 
+async function onFileChange(uri: vscode.Uri) {
+  if (!isAmazonQActive()) return;
+
+  // Nếu file đang mở, onTextChange đã handle rồi -> bỏ qua
+  const isOpen = vscode.workspace.textDocuments.some(doc => doc.uri.toString() === uri.toString());
+  if (isOpen) return;
+
+  // Filter noise
+  const fsPath = uri.fsPath;
+  if (fsPath.includes('node_modules') || fsPath.includes('.git') || fsPath.includes(path.sep + 'out' + path.sep)) return;
+
+  // Gửi checkpoint cho file không mở
+  await sendAiCheckpoint(uri, 'amazon-q');
+  bumpStatus();
+}
+
 async function onTextChange(event: vscode.TextDocumentChangeEvent) {
-  const editor = vscode.window.activeTextEditor;
-  if (!editor || event.document !== editor.document) return;
+  // Remove strict check for activeTextEditor to support background edits (e.g. Apply to all files)
+  // const editor = vscode.window.activeTextEditor;
+  // if (!editor || event.document !== editor.document) return;
+  
+  if (event.document.uri.scheme !== 'file') return;
   if (!isAmazonQActive()) return;
 
   const hasLargeChange = event.contentChanges.some((c) => {
@@ -60,20 +85,21 @@ async function onTextChange(event: vscode.TextDocumentChangeEvent) {
 
   const doc = event.document;
   // Gửi AI checkpoint tối thiểu cho file này
-  await sendAiCheckpoint(doc, 'amazon-q');
+  // Gửi AI checkpoint tối thiểu cho file này
+  await sendAiCheckpoint(doc.uri, 'amazon-q');
   bumpStatus();
 }
 
 async function manualHumanCheckpoint() {
   const editor = vscode.window.activeTextEditor;
   if (!editor) return;
-  await sendHumanCheckpoint(editor.document);
+  await sendHumanCheckpoint(editor.document.uri);
 }
 
 async function manualAiCheckpoint() {
   const editor = vscode.window.activeTextEditor;
   if (!editor) return;
-  await sendAiCheckpoint(editor.document, 'amazon-q-manual');
+  await sendAiCheckpoint(editor.document.uri, 'amazon-q-manual');
   bumpStatus();
 }
 
@@ -82,11 +108,11 @@ function bumpStatus() {
   statusBarItem.text = `$(git-commit) AI: ${current + 1}`;
 }
 
-async function sendHumanCheckpoint(doc: vscode.TextDocument) {
+async function sendHumanCheckpoint(uri: vscode.Uri) {
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!workspaceRoot) return;
 
-  const fileRelPath = path.relative(workspaceRoot, doc.uri.fsPath);
+  const fileRelPath = path.relative(workspaceRoot, uri.fsPath);
 
   const payload: AgentV1Human = {
     type: 'human',
@@ -97,11 +123,11 @@ async function sendHumanCheckpoint(doc: vscode.TextDocument) {
   await callGitAiAgentV1(payload);
 }
 
-async function sendAiCheckpoint(doc: vscode.TextDocument, agentName: string) {
+async function sendAiCheckpoint(uri: vscode.Uri, agentName: string) {
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!workspaceRoot) return;
 
-  const fileRelPath = path.relative(workspaceRoot, doc.uri.fsPath);
+  const fileRelPath = path.relative(workspaceRoot, uri.fsPath);
 
   const payload: AgentV1AiAgent = {
     type: 'ai_agent',
