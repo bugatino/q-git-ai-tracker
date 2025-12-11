@@ -48,7 +48,7 @@
             "type": "string"
           },
           "default": [
-            "*"
+            "**"
           ],
           "description": "Glob patterns for repositories where git-ai is allowed"
         },

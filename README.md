@@ -41,7 +41,7 @@ git-ai --version
 
 This extension contributes the following settings:
 
-*   `q-git-ai.debounceMs`: Debounce time in milliseconds for tracking text changes. (Default: `150`)
+*   `q-git-ai.allow_repositories`: List of glob patterns for repositories where git-ai is allowed. Default: `["**"]` (matches all).
 *   `q-git-ai.minChangeSize`: Minimum number of characters changed to be considered as an Amazon Q insertion. (Default: `3`)
 
 ## Usage

@@ -11,7 +11,7 @@ export class Config {
   }
 
   static get allowRepositories(): string[] {
-    return vscode.workspace.getConfiguration('q-git-ai').get<string[]>('allow_repositories') || ['*'];
+    return vscode.workspace.getConfiguration('q-git-ai').get<string[]>('allow_repositories') || ['**'];
   }
 
   static get excludeRepositories(): string[] {
