@@ -2,7 +2,7 @@
   "name": "q-git-ai-tracker",
   "displayName": "Amazon Q → Git AI Tracker",
   "description": "Tracks Amazon Q edits and creates git-ai before/after checkpoints",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "engines": {
     "vscode": "^1.90.0"
   },
@@ -35,12 +35,6 @@
           "type": "string",
           "default": "amazon-q",
           "description": "Agent name used for git-ai checkpoints"
-        },
-        "q-git-ai.debounceMs": {
-          "type": "number",
-          "default": 150,
-          "minimum": 50,
-          "description": "Debounce time for text changes (ms)"
         },
         "q-git-ai.minChangeSize": {
           "type": "number",
