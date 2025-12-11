@@ -39,10 +39,17 @@ export class InstallManager {
                 title: "Installing git-ai...",
                 cancellable: false
             }, async () => {
-                const installCmd = 'curl -sSL https://raw.githubusercontent.com/acunniffe/git-ai/main/install.sh | bash';
+                const scriptPath = path.join(this.context.extensionPath, 'resources', 'install.sh');
+                const installCmd = `bash "${scriptPath}"`;
                 await runCommand(installCmd, [], homeDir, true);
             });
-            vscode.window.showInformationMessage('[q-git-ai] git-ai installed successfully.');
+            const selection = await vscode.window.showInformationMessage(
+                '[q-git-ai] git-ai installed successfully. Please reload the window to apply changes.',
+                'Reload Window'
+            );
+            if (selection === 'Reload Window') {
+                vscode.commands.executeCommand('workbench.action.reloadWindow');
+            }
         } catch (e) {
             vscode.window.showErrorMessage(`[q-git-ai] Failed to install git-ai: ${e}`);
             return;
