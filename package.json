@@ -27,6 +27,21 @@
       {
         "command": "q-git-ai.manualAfterEdit",
         "title": "Git AI: Manual After-Edit Checkpoint (Amazon Q)"
+      },
+      {
+        "command": "q-git-ai-tracker.install",
+        "title": "Install git-ai",
+        "category": "Q Git AI"
+      },
+      {
+        "command": "q-git-ai-tracker.showLogs",
+        "title": "Show Git AI Logs",
+        "category": "Q Git AI"
+      },
+      {
+        "command": "q-git-ai-tracker.clearLogs",
+        "title": "Clear Git AI Logs",
+        "category": "Q Git AI"
       }
     ],
     "configuration": {

@@ -1,9 +1,11 @@
 import * as vscode from 'vscode';
 import { InstallManager } from './managers/install';
+import { LogManager } from './managers/log';
 import { AIEditManager } from './managers/ai-edit';
 
 let statusBarItem: vscode.StatusBarItem;
 let installManager: InstallManager;
+let logManager: LogManager;
 let aiEditManager: AIEditManager;
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -15,6 +17,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // Managers Setup
   installManager = new InstallManager(context);
+  logManager = new LogManager(context);
   aiEditManager = new AIEditManager(context, statusBarItem);
 
   // Activate Managers
@@ -27,7 +30,10 @@ export async function activate(context: vscode.ExtensionContext) {
   // Manual commands
   context.subscriptions.push(
     vscode.commands.registerCommand('q-git-ai.manualHumanCheckpoint', () => manualHumanCheckpoint()),
-    vscode.commands.registerCommand('q-git-ai.manualAiCheckpoint', () => manualAiCheckpoint())
+    vscode.commands.registerCommand('q-git-ai-tracker.install', () => installManager.setup()),
+    vscode.commands.registerCommand('q-git-ai.manualAiCheckpoint', () => manualAiCheckpoint()),
+    vscode.commands.registerCommand('q-git-ai-tracker.showLogs', () => logManager.showLogs()),
+    vscode.commands.registerCommand('q-git-ai-tracker.clearLogs', () => logManager.clearLogs())
   );
 
   console.log('[q-git-ai] agent-v1 integration activated');
