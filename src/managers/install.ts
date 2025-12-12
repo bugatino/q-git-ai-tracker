@@ -39,9 +39,16 @@ export class InstallManager {
                 title: "Installing git-ai...",
                 cancellable: false
             }, async () => {
-                const scriptPath = path.join(this.context.extensionPath, 'resources', 'install.sh');
-                const installCmd = `bash "${scriptPath}"`;
-                await runCommand(installCmd, [], homeDir, true);
+                if (process.platform === 'win32') {
+                    const scriptPath = path.join(this.context.extensionPath, 'resources', 'install.ps1');
+                    // Use -ExecutionPolicy Bypass to ensure the script runs
+                    const installCmd = `powershell -ExecutionPolicy Bypass -File "${scriptPath}"`;
+                    await runCommand(installCmd, [], homeDir, true);
+                } else {
+                    const scriptPath = path.join(this.context.extensionPath, 'resources', 'install.sh');
+                    const installCmd = `bash "${scriptPath}"`;
+                    await runCommand(installCmd, [], homeDir, true);
+                }
             });
             const selection = await vscode.window.showInformationMessage(
                 '[q-git-ai] git-ai installed successfully. Please reload the window to apply changes.',

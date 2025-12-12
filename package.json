@@ -3,7 +3,7 @@
   "publisher": "rdb-platform",
   "displayName": "Amazon Q → Git AI Tracker",
   "description": "Tracks Amazon Q edits and creates git-ai before/after checkpoints",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "engines": {
     "vscode": "^1.90.0"
   },
