@@ -19,8 +19,10 @@ function Log-Message {
         [Parameter(Mandatory = $true)][string]$Message,
         [Parameter(Mandatory = $false)][string]$Color = "White"
     )
-    # Write to console
-    Write-Host $Message -ForegroundColor $Color
+    # Write to pipeline/stdout so it can be captured
+    try {
+        Write-Output $Message
+    } catch {}
     
     # Write to file
     try {
