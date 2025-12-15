@@ -12,7 +12,7 @@ export class InstallManager {
     this.context = context;
   }
 
-  async setup(): Promise<void> {
+  async setup(interactive: boolean = false): Promise<void> {
     const homeDir = process.env.HOME || process.env.USERPROFILE || '';
     if (!homeDir) {
       console.error('[q-git-ai] Could not determine HOME directory.');
@@ -25,8 +25,27 @@ export class InstallManager {
 
     const isInstalled = fs.existsSync(executablePath);
 
-    if (!isInstalled) {
-      const choice = await vscode.window.showInformationMessage(
+    if (isInstalled && interactive) {
+        const choice = await vscode.window.showInformationMessage(
+            '[q-git-ai] git-ai is already installed. Do you want to re-install / update it?',
+            'Re-install',
+            'Cancel'
+        );
+        if (choice !== 'Re-install') {
+            return;
+        }
+        // Proceed to install (fall through)
+    } else if (isInstalled) {
+        // Not interactive, already installed -> just registration
+        this.addPath(binPath);
+        this.context.workspaceState.update('git-ai-bin-path', binPath);
+        await this.checkVersion(executablePath);
+        return; 
+    }
+
+    if (!isInstalled || interactive) {
+      // If we are here, we either aren't installed OR we are interactive and chose to reinstall
+      const choice = interactive ? 'Install' : await vscode.window.showInformationMessage(
         '[q-git-ai] git-ai is not installed. Do you want to install it automatically?',
         'Install',
         'Cancel'
@@ -66,18 +85,19 @@ export class InstallManager {
       }
     }
 
-    // Add to PATH
-    if (process.env.PATH && !process.env.PATH.includes(binPath)) {
-      process.env.PATH = `${binPath}${path.delimiter}${process.env.PATH}`;
-      console.log('[q-git-ai] Added git-ai to PATH:', binPath);
-    }
-
-    // Store binPath for deactivation cleanup
+    this.addPath(binPath);
     this.context.workspaceState.update('git-ai-bin-path', binPath);
-
-    // Version Check
     await this.checkVersion(executablePath);
   }
+
+  private addPath(binPath: string) {
+    // Add to PATH
+    if (process.env.PATH && !process.env.PATH.includes(binPath)) {
+        process.env.PATH = `${binPath}${path.delimiter}${process.env.PATH}`;
+        console.log('[q-git-ai] Added git-ai to PATH:', binPath);
+    }
+  }
+
 
   async checkVersion(executablePath: string): Promise<void> {
     try {

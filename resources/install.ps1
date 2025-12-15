@@ -1,11 +1,39 @@
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
+# --- Logging Setup ---
+$Global:LogFile = Join-Path $HOME ".git-ai\install.log"
+# Ensure dir exists (it might not default exist yet, but we usually create .git-ai later. Let's create it now if needed for logging)
+$LogDir = Split-Path $Global:LogFile -Parent
+if (-not (Test-Path -LiteralPath $LogDir)) {
+    New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
+}
+try {
+    "--- Install Log Started: $(Get-Date) ---" | Out-File -FilePath $Global:LogFile -Encoding UTF8 -Force
+} catch {
+    Write-Host "Warning: Could not create log file at $Global:LogFile" -ForegroundColor Yellow
+}
+
+function Log-Message {
+    param(
+        [Parameter(Mandatory = $true)][string]$Message,
+        [Parameter(Mandatory = $false)][string]$Color = "White"
+    )
+    # Write to console
+    Write-Host $Message -ForegroundColor $Color
+    
+    # Write to file
+    try {
+        "$(Get-Date -Format 'HH:mm:ss') $Message" | Out-File -FilePath $Global:LogFile -Append -Encoding UTF8 -ErrorAction SilentlyContinue
+    } catch {}
+}
+
 function Write-ErrorAndExit {
     param(
         [Parameter(Mandatory = $true)][string]$Message
     )
-    Write-Host "Error: $Message" -ForegroundColor Red
+    Log-Message "Error: $Message" -Color Red
+    Log-Message "Log file is available at: $Global:LogFile" -Color Yellow
     exit 1
 }
 
@@ -13,14 +41,14 @@ function Write-Success {
     param(
         [Parameter(Mandatory = $true)][string]$Message
     )
-    Write-Host $Message -ForegroundColor Green
+    Log-Message $Message -Color Green
 }
 
 function Write-Warning {
     param(
         [Parameter(Mandatory = $true)][string]$Message
     )
-    Write-Host $Message -ForegroundColor Yellow
+    Log-Message $Message -Color Yellow
 }
 
 function Wait-ForFileAvailable {
@@ -39,7 +67,7 @@ function Wait-ForFileAvailable {
             return $true
         } catch {
             if ($elapsed -eq 0) {
-                Write-Host "Waiting for file to be available: $Path" -ForegroundColor Yellow
+                Log-Message "Waiting for file to be available: $Path" -Color Yellow
             }
             Start-Sleep -Seconds $RetryIntervalSeconds
             $elapsed += $RetryIntervalSeconds
@@ -138,12 +166,15 @@ function Set-PathPrependBeforeGit {
             $userStatus = 'AlreadyPresent'
         }
     } catch {
+        Log-Message "Error updating User PATH: $_" -Color Red
         $userStatus = 'Error'
     }
 
     # Try to update Machine PATH
     $machineStatus = 'Skipped'
     try {
+        # Check if we are running as admin basically by trying to access machine path
+        # If this fails, we catch it.
         $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
         $newMachinePath = BuildPathWithInsert -existingPath $machinePath -toInsert $PathToAdd
         if ($newMachinePath -ne $machinePath) {
@@ -154,22 +185,27 @@ function Set-PathPrependBeforeGit {
             $machineStatus = 'AlreadyPresent'
         }
     } catch {
-        # Access denied or not elevated; do NOT modify User PATH. Print big red error with instructions.
-        $origGit = $null
-        try { $origGit = Get-StdGitPath } catch { }
-        $origGitDir = if ($origGit) { (Split-Path $origGit -Parent) } else { 'your Git installation directory' }
-        Write-Host ''
-        Write-Host 'ERROR: Unable to update the SYSTEM PATH (administrator rights required).' -ForegroundColor Red
-        Write-Host 'Your PATH was NOT changed. To ensure git-ai takes precedence over Git:' -ForegroundColor Red
-        Write-Host ("  1) Run PowerShell as Administrator and re-run this installer; OR") -ForegroundColor Red
-        Write-Host ("  2) Manually edit the SYSTEM Path and move '{0}' before any entries containing 'Git' (e.g. '{1}')." -f $PathToAdd, $origGitDir) -ForegroundColor Red
-        Write-Host "     Steps: Start → type 'Environment Variables' → 'Edit the system environment variables' → Environment Variables →" -ForegroundColor Red
-        Write-Host "            Under 'System variables', select 'Path' → Edit → Move '{0}' to the top (before Git) → OK." -f $PathToAdd -ForegroundColor Red
-        Write-Host ''
+        # Access denied or not elevated
+        
+        # If User update was successful, this is just a warning (likely Domain/Non-Admin user)
         if ($userStatus -eq 'Updated' -or $userStatus -eq 'AlreadyPresent') {
-            Write-Host 'User PATH was updated successfully, so git-ai will still take precedence for this account.' -ForegroundColor Yellow
+            Log-Message "Warning: Unable to update SYSTEM PATH (admin rights required). This is normal for non-admin users." -Color Yellow
+            Log-Message "git-ai is configured for your User account only." -Color Yellow
+            $machineStatus = 'AccessDenied_Ignored'
+        } else {
+            # Critical error: neither User nor Machine could be updated
+            $origGit = $null
+            try { $origGit = Get-StdGitPath } catch { }
+            $origGitDir = if ($origGit) { (Split-Path $origGit -Parent) } else { 'your Git installation directory' }
+            
+            Log-Message ''
+            Log-Message 'ERROR: Unable to update either USER or SYSTEM PATH.' -Color Red
+            Log-Message 'To ensure git-ai takes precedence over Git:' -Color Red
+            Log-Message ("  1) Run PowerShell as Administrator and re-run this installer; OR") -Color Red
+            Log-Message ("  2) Manually edit the Environment Variables." ) -Color Red
+            Log-Message ''
+            $machineStatus = 'Error'
         }
-        $machineStatus = 'Error'
     }
 
     # Update current process PATH immediately for this session
@@ -201,7 +237,18 @@ if (-not (Test-Path -LiteralPath $sourceBinary)) {
     Write-ErrorAndExit "Could not find bundled binary at $sourceBinary"
 }
 
-Write-Host "Installing git-ai from $sourceBinary..."
+# Determine binary name
+BINARY_NAME="git-ai-${OS}-${ARCH}"
+
+# Resolve script directory to find binaries
+$scriptDir = $PSScriptRoot
+$sourceBinary = Join-Path $scriptDir "bin\git-ai-windows-x64.exe"
+
+if (-not (Test-Path -LiteralPath $sourceBinary)) {
+    Write-ErrorAndExit "Could not find bundled binary at $sourceBinary"
+}
+
+Log-Message "Installing git-ai from $sourceBinary..."
 $finalExe = Join-Path $installDir 'git-ai.exe'
 
 # Wait for git-ai.exe to be available if it exists and is in use
@@ -234,7 +281,7 @@ Set-Content -Path $gitOgShim -Value $gitOgShimContent -Encoding ASCII -Force
 try { Unblock-File -Path $gitOgShim -ErrorAction SilentlyContinue } catch { }
 
 # Install hooks
-Write-Host 'Setting up IDE/agent hooks...'
+Log-Message 'Setting up IDE/agent hooks...'
 try {
     & $finalExe install-hooks | Out-Host
     Write-Success 'Successfully set up IDE/agent hooks'
@@ -249,7 +296,7 @@ if ($pathUpdate.UserStatus -eq 'Updated') {
 } elseif ($pathUpdate.UserStatus -eq 'AlreadyPresent') {
     Write-Success 'git-ai already present in the user PATH.'
 } elseif ($pathUpdate.UserStatus -eq 'Error') {
-    Write-Host 'Failed to update the user PATH.' -ForegroundColor Red
+    Log-Message 'Failed to update the user PATH.' -Color Red
 }
 
 if ($pathUpdate.MachineStatus -eq 'Updated') {
@@ -257,7 +304,7 @@ if ($pathUpdate.MachineStatus -eq 'Updated') {
 } elseif ($pathUpdate.MachineStatus -eq 'AlreadyPresent') {
     Write-Success 'git-ai already present in the system PATH.'
 } elseif ($pathUpdate.MachineStatus -eq 'Error') {
-    Write-Host 'PATH update failed: system PATH unchanged.' -ForegroundColor Red
+    Log-Message 'PATH update failed: system PATH unchanged.' -Color Red
 }
 
 Write-Success "Successfully installed git-ai into $installDir"
@@ -276,7 +323,7 @@ try {
         $cfg | Out-File -FilePath $configJsonPath -Encoding UTF8 -Force
     }
 } catch {
-    Write-Host "Warning: Failed to write config.json: $($_.Exception.Message)" -ForegroundColor Yellow
+    Log-Message "Warning: Failed to write config.json: $($_.Exception.Message)" -Color Yellow
 }
 
-Write-Host 'Close and reopen your terminal and IDE sessions to use git-ai.' -ForegroundColor Yellow
+Log-Message 'Close and reopen your terminal and IDE sessions to use git-ai.' -Color Yellow

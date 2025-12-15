@@ -21,16 +21,19 @@ export async function activate(context: vscode.ExtensionContext) {
   aiEditManager = new AIEditManager(context, statusBarItem);
 
   // Activate Managers
+  // Activate Managers
   // 1. Install & Check Requirements
-  await installManager.setup();
+  console.log('[q-git-ai] Checking git-ai installation...');
+  await installManager.setup(false); // Non-interactive check on startup
 
   // 2. Start Listening for Edits
+  console.log('[q-git-ai] Activating AI Edit Manager...');
   aiEditManager.activate();
 
   // Manual commands
   context.subscriptions.push(
     vscode.commands.registerCommand('q-git-ai.manualHumanCheckpoint', () => manualHumanCheckpoint()),
-    vscode.commands.registerCommand('q-git-ai-tracker.install', () => installManager.setup()),
+    vscode.commands.registerCommand('q-git-ai-tracker.install', () => installManager.setup(true)), // Interactive install
     vscode.commands.registerCommand('q-git-ai.manualAiCheckpoint', () => manualAiCheckpoint()),
     vscode.commands.registerCommand('q-git-ai-tracker.showLogs', () => logManager.showLogs()),
     vscode.commands.registerCommand('q-git-ai-tracker.clearLogs', () => logManager.clearLogs())
@@ -40,8 +43,10 @@ export async function activate(context: vscode.ExtensionContext) {
 }
 
 export function deactivate() {
+  console.log('[q-git-ai] Deactivating extension...');
   statusBarItem?.dispose();
   installManager?.dispose();
+  console.log('[q-git-ai] Extension deactivated.');
 }
 
 async function manualHumanCheckpoint() {
