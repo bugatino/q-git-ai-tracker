@@ -60,8 +60,10 @@ export class InstallManager {
             }, async () => {
                 if (process.platform === 'win32') {
                     const scriptPath = path.join(this.context.extensionPath, 'resources', 'install.ps1');
-                    // Use -ExecutionPolicy Bypass to ensure the script runs
-                    const installCmd = `powershell -ExecutionPolicy Bypass -File "${scriptPath}"`;
+                    // Use -NoProfile to avoid permission issues with user profile scripts
+                    // Use -NonInteractive to prevent hanging
+                    // Use -ExecutionPolicy Bypass to run standard script
+                    const installCmd = `powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${scriptPath}"`;
                     await runCommand(installCmd, [], homeDir, true);
                 } else {
                     const scriptPath = path.join(this.context.extensionPath, 'resources', 'install.sh');

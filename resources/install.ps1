@@ -1,3 +1,4 @@
+Write-Output "DEBUG: install.ps1 starting..."
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
